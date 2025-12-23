@@ -26,17 +26,16 @@ MAKES-REALCLEAN := \
 	.whisper-model-downloaded \
 	__pycache__/ \
 
+# Base dependencies (Python and packages)
 DEPS := \
   $(PYTHON) \
   $(PYTHON-VENV)/bin/pynput \
 
-# Use command-line engine if provided, otherwise use config
-RUNTIME_ENGINE = $(if $(engine),$(engine),$(CONFIG_ENGINE))
-
-ifeq ($(RUNTIME_ENGINE),whisper)
-  DEPS += $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
+# Additional dependencies based on engine (for install target)
+ifeq ($(CONFIG_ENGINE),whisper)
+  INSTALL_DEPS := $(DEPS) $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
 else
-  DEPS += $(MODEL)
+  INSTALL_DEPS := $(DEPS) $(MODEL)
 endif
 
 SERVICE-FILE := $(HOME)/.config/systemd/user/voice2keyboard.service
@@ -81,12 +80,18 @@ ifeq ($(key),)
 	@echo "       make run engine=vosk key=shift_l-ctrl_r"
 	@exit 1
 endif
+ifeq ($(engine),vosk)
+	@$(MAKE) -s $(MODEL)
+endif
+ifeq ($(engine),whisper)
+	@$(MAKE) -s $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
+endif
 	python voice2keyboard.py $(RUN_ARGS)
 
 help: $(DEPS)
 	python voice2keyboard.py --help
 
-install: $(DEPS) $(SERVICE-FILE)
+install: $(INSTALL_DEPS) $(SERVICE-FILE)
 	systemctl --user daemon-reload
 	systemctl --user enable voice2keyboard
 	systemctl --user start voice2keyboard
@@ -111,10 +116,10 @@ logs:
 	journalctl --user -u voice2keyboard -f
 
 $(PYTHON-VENV)/bin/pynput: $(PYTHON-VENV)
-	pip install pynput pyyaml vosk
+	pip install -q pynput pyyaml vosk
 
 $(PYTHON-VENV)/bin/faster_whisper: $(PYTHON-VENV)
-	pip install faster-whisper numpy
+	pip install -q faster-whisper numpy
 
 .whisper-model-downloaded: $(PYTHON-VENV)/bin/faster_whisper
 	python -c "from faster_whisper import WhisperModel; WhisperModel('$(if $(model),$(model),$(WHISPER_MODEL))')"
