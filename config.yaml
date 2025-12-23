@@ -1,56 +1,64 @@
 # voice2keyboard configuration
 
 # Trigger key to hold for recording
-# Options: alt_r, alt_l, ctrl_r, ctrl_l, shift_r, shift_l, scroll_lock, pause, insert, delete
-trigger_key: alt_r
+# Single keys: alt_l, alt_r, ctrl_l, ctrl_r, shift_l, shift_r, scroll_lock, pause, insert, delete
+# Combinations: shift_l-ctrl_l, shift_l-ctrl_r, etc.
+key: alt_r
 
-# Default model (can be overridden via command line)
-default_model: vosk-model-small-en-us-0.15
-# default_model: vosk-model-en-us-0.22-lgraph  # medium
+# Speech recognition engine: vosk or whisper
+engine: vosk
+# engine: whisper
+
+# Model name (depends on engine)
+# Vosk: vosk-model-small-en-us-0.15, vosk-model-en-us-0.22-lgraph
+# Whisper: tiny.en, base.en, small.en, medium.en (small.en is default - good speed/accuracy)
+model: vosk-model-small-en-us-0.15
+# model: small.en
 
 # Typing mode: how text is output
 # - buffered: Wait for natural pauses before typing (more accurate, recommended)
 # - realtime: Type words immediately as recognized (faster, less accurate)
-typing_mode: buffered
+mode: buffered
 
-# Additional delay (in seconds) after speech pause before typing
+# Pause delay (in seconds) after speech pause before typing
 # Gives the model extra time to refine predictions with full context
 # Set to 0 to disable. Only applies in buffered mode.
-pause_delay: 0.3
+pause: 0.3
 
 # Voice commands for punctuation and formatting
 # Say the word on the left, get the symbol on the right
-voice_commands:
-  full stop: "."
-  full step: "."
-  for stop: "."
-  for step: "."
-  falstaff: "."
-  tadpole: ","
-  karma: ","
-  see ally: "CLI"
+commands:
+  full stop: '.'
+  full step: '.'
+  for stop: '.'
+  for step: '.'
+  falstaff: '.'
+  tadpole: ','
+  karma: ','
+  see ally: 'CLI'
   i'm: "I'm"
   i've: "I've"
-  question mark: "?"
-  exclamation mark: "!"
-  colon: ":"
-  semicolon: ";"
-  hyphen: "-"
-  dash: "-"
-  quote: '"'
-  parenthesis: "("
-  parentheses: ")"
-  return: "\n"
-  paragraph: "\n\n"
+  question mark: '?'
+  exclamation mark: '!'
+  explanation mark: '!'
+  colon: ':'
+  semicolon: ';'
+  hyphen: '-'
+  dash: '-'
+  tick mark: "'"
+  quote mark: '"'
+  open parenthesis: '('
+  close parentheses: ')'
+  return return: "\n"
+  new paragraph: "\n\n"
   # Numbers
-  zero: "0"
-  one: "1"
-  two: "2"
-  three: "3"
-  four: "4"
-  five: "5"
-  six: "6"
-  seven: "7"
-  eight: "8"
-  nine: "9"
-  ten: "10"
+  digit zero: '0'
+  digit one: '1'
+  digit two: '2'
+  digit three: '3'
+  digit four: '4'
+  digit five: '5'
+  digit six: '6'
+  digit seven: '7'
+  digit eight: '8'
+  digit nine: '9'

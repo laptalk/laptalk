@@ -1,32 +1,90 @@
 M := .cache/makes
 $(shell [ -d $M ] || ( git clone -q https://github.com/makeplus/makes $M))
 
+# Use Python 3.13 (3.14 has compatibility issues with faster-whisper)
+PYTHON-VERSION ?= 3.13.1
+
 include $M/init.mk
 include $M/python.mk
 include $M/clean.mk
 include $M/shell.mk
 include $M/agents.mk
 
-MODEL := $(shell grep ^default_model: config.yaml | cut -f2 -d' ')
+CONFIG_ENGINE := $(shell grep ^engine: config.yaml | cut -f2 -d' ' | tr -d ' ')
+CONFIG_ENGINE ?= vosk
+
+MODEL := $(shell grep ^model: config.yaml | cut -f2 -d' ')
+MODEL ?= vosk-model-small-en-us-0.15
+
+# Default Whisper model if not specified
+WHISPER_MODEL ?= small.en
 
 VOSK-URL := https://alphacephei.com/vosk/models
 
 MAKES-REALCLEAN := \
 	vosk-* \
+	.whisper-model-downloaded \
+	__pycache__/ \
 
 DEPS := \
   $(PYTHON) \
   $(PYTHON-VENV)/bin/pynput \
 
+# Use command-line engine if provided, otherwise use config
+RUNTIME_ENGINE = $(if $(engine),$(engine),$(CONFIG_ENGINE))
+
+ifeq ($(RUNTIME_ENGINE),whisper)
+  DEPS += $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
+else
+  DEPS += $(MODEL)
+endif
+
 SERVICE-FILE := $(HOME)/.config/systemd/user/voice2keyboard.service
 
 export XDG_SESSION_TYPE := x11
 
-key ?= alt_r
+# Make variables for run target (override from command line)
+engine ?=
+model ?=
+key ?=
+mode ?=
+pause ?=
 
+# Build command-line arguments
+RUN_ARGS :=
+ifneq ($(engine),)
+  RUN_ARGS += --engine=$(engine)
+endif
+ifneq ($(model),)
+  RUN_ARGS += --model=$(model)
+endif
+ifneq ($(key),)
+  RUN_ARGS += --key=$(key)
+endif
+ifneq ($(mode),)
+  RUN_ARGS += --mode=$(mode)
+endif
+ifneq ($(pause),)
+  RUN_ARGS += --pause=$(pause)
+endif
 
-run: $(MODEL) $(DEPS)
-	TRIGGER_KEY=$(key) python voice2keyboard.py $<
+run: $(DEPS)
+ifeq ($(engine),)
+	@echo "Error: engine parameter required"
+	@echo "Usage: make run engine=whisper key=alt_r"
+	@echo "       make run engine=vosk key=shift_l-ctrl_r"
+	@exit 1
+endif
+ifeq ($(key),)
+	@echo "Error: key parameter required"
+	@echo "Usage: make run engine=whisper key=alt_r"
+	@echo "       make run engine=vosk key=shift_l-ctrl_r"
+	@exit 1
+endif
+	python voice2keyboard.py $(RUN_ARGS)
+
+help: $(DEPS)
+	python voice2keyboard.py --help
 
 install: $(DEPS) $(SERVICE-FILE)
 	systemctl --user daemon-reload
@@ -53,7 +111,14 @@ logs:
 	journalctl --user -u voice2keyboard -f
 
 $(PYTHON-VENV)/bin/pynput: $(PYTHON-VENV)
-	pip install pynput vosk pyyaml
+	pip install pynput pyyaml vosk
+
+$(PYTHON-VENV)/bin/faster_whisper: $(PYTHON-VENV)
+	pip install faster-whisper numpy
+
+.whisper-model-downloaded: $(PYTHON-VENV)/bin/faster_whisper
+	python -c "from faster_whisper import WhisperModel; WhisperModel('$(if $(model),$(model),$(WHISPER_MODEL))')"
+	touch $@
 
 $(MODEL): $(MODEL).zip
 	unzip $<

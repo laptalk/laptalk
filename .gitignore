@@ -1,3 +1,7 @@
 /.cache/
+/.claude/
 /CLAUDE.md
 /vosk*
+/__pycache__/
+/out.txt
+/.whisper-model-downloaded
