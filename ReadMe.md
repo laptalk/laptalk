@@ -4,13 +4,25 @@ voice2keyboard
 Voice to Keyboard Typing
 
 
+## Status
+
+Only tested on Linux so far.
+Please report any issues or success stories.
+
+
 ## Synopsis
 
+Run this in a terminal:
+
 ```bash
-make run engine=whisper key=alt_r
-make run engine=vosk key=shift_l-ctrl_r
-make run engine=whisper key=ctrl_l model=medium.en
+git clone https://github.com/ingydotnet/voice2keyboard
+cd voice2keyboard
+make run key=alt_r
 ```
+
+Then press the Right-Control key and speak and let go.
+
+Your speech will be converted to text and typed whereever your input focus is!
 
 
 ## Description
@@ -20,27 +32,26 @@ input.
 Hold a trigger key (or key combination) to record, and words appear at your
 cursor as you speak.
 
-Supports two speech recognition engines:
-- **Vosk** - Fast, offline, streaming recognition
-- **Whisper** - Higher accuracy, better with technical terms, batch processing
+Supports two speech recognition engines with automatic detection:
+- **Whisper** - High accuracy, great with technical terms, batch processing
+- **Vosk** - Fast, offline, streaming recognition (models start with `vosk-`)
+
+The engine is automatically inferred from the model name - no need to specify
+it separately.
 
 Can be set up as a systemd user service for always-on availability.
 
 
 ## Features
 
-- **Dual engine support** - Choose between Vosk (streaming) or Whisper
-  (accurate)
+- **Works everywhere** - Types into any application that accepts keyboard input
 - **Push-to-talk input** - Hold a trigger key or combination (e.g., Shift+Ctrl)
   to activate recording
 - **Two typing modes** - Buffered (accurate, waits for pauses) or Realtime
   (immediate)
-- **Works everywhere** - Types into any application that accepts keyboard input
-- **Voice translations** - Say "tadpole", "question mark", etc. to insert
-  punctuation
 - **Offline processing** - Both engines work locally, no internet required
 - **Auto-start on login** - Can run as a systemd user service
-- **Configurable** - Customize engine, trigger key, typing mode, and voice
+- **Configurable** - Customize model, trigger key, typing mode, and voice
   translations via YAML
 
 
@@ -80,8 +91,8 @@ sudo apt install alsa-utils   # provides arecord
 git clone https://github.com/ingydotnet/voice2keyboard
 cd voice2keyboard
 
-# Install and start the service
-make install
+# Run it
+make run key=alt_r
 ```
 
 That's it! The service will:
@@ -92,18 +103,11 @@ That's it! The service will:
 5. Start the service immediately
 
 
-### Verify Installation
-
-```bash
-make status   # Check if service is running
-make logs     # View live logs
-```
-
 ## Usage
 
 1. **Hold the trigger key** (default: Right Alt) in any application
-2. **Speak** - words appear at your cursor
-3. **Release the key** to stop recording
+2. **Speak** - words appear at your cursor (vosk streaming)
+3. **Release the key** to stop recording and start typing (whisper)
 
 
 ### Typing Modes
@@ -119,41 +123,28 @@ make logs     # View live logs
 - Only works with Vosk engine
 
 
-### Voice Translations
+### Vosk Translations
 
-Say these words to insert punctuation and special characters:
+See the `config.yaml` for a table of Vosk translations.
 
-| Say | Types |
-|-----|-------|
-| "full stop" / "full step" | `.` |
-| "tadpole" | `,` |
-| "question mark" | `?` |
-| "exclamation mark" | `!` |
-| "colon" | `:` |
-| "semicolon" | `;` |
-| "hyphen" / "dash" | `-` |
-| "quote" | `"` |
-| "return" | newline |
-| "paragraph" | double newline |
-| "zero" - "ten" | `0` - `10` |
-
-Voice translations are case-insensitive and work even when Whisper adds its own
-punctuation.
+Whisper gets almost everything right!
 
 
 ## Configuration
 
-Edit `config.yaml` to customize behavior:
+The stock configuration works great, but you can edit the `config.yaml` to
+customize some behavior.
+You can also set any of the config options from command line arguments.
 
-**Note:** Engine and trigger key are specified via command-line arguments, not in
-config.
+**Note:** The trigger key is specified via a CLI argument, not in the config.
+The trigger key is the only mandatory command line option.
 
 ```yaml
-# Model names for each engine (can override with --model on command line)
-# Vosk models: vosk-model-small-en-us-0.15, vosk-model-en-us-0.22-lgraph
-# Whisper models: tiny.en, base.en, small.en, medium.en
-vosk-model: vosk-model-small-en-us-0.15
-whisper-model: small.en
+# Model selection:
+# - Whisper models: tiny, tiny.en, base, base.en, small, small.en, medium.en, etc.
+# - Vosk models: vosk-model-small-en-us-0.15, vosk-model-en-us-0.22, etc.
+# Can override with --model on command line
+model: base.en
 
 # Typing mode
 # - buffered: Wait for natural pauses before typing (more accurate)
@@ -166,7 +157,7 @@ mode: buffered
 pause: 0.3
 
 # Voice translations - say the word, get the symbol
-translations:
+vosk-translations:
   full stop: "."
   tadpole: ","
   question mark: "?"
@@ -176,42 +167,59 @@ translations:
 
 ## Command Line Usage
 
-The `--engine` and `--key` parameters are required for all manual runs.
-Model selection uses the engine-specific config value (`vosk-model` or
-`whisper-model`) unless overridden with `--model`.
+Typically you just run:
+
+```
+$ make run key=alt_r
+```
+
+You can also also run:
+
+```
+$ python voice2keyboard.py --key=alt_r
+```
+
+but the `make` command installs all the prerequisites (including even a local
+python binary under `.cache/.local/`).
+
+The `key=...` parameter is required for all manual runs.
+Model selection uses the config value unless overridden with `model=...`.
 
 
 ### Running Manually
 
 ```bash
-# Run with Whisper engine and Alt_R key
-make run engine=whisper key=alt_r
+# Run with default model (from config) and Alt_R key
+make run key=alt_r
 
-# Run with Vosk engine and key combination
-make run engine=vosk key=shift_l-ctrl_r
+# Run with Vosk model and key combination
+make run key=shift_l-ctrl_r model=vosk-model-small-en-us-0.15
 
 # With additional options
-make run engine=whisper key=ctrl_l mode=buffered
+make run key=ctrl_l mode=buffered
 
-# Override model
-make run engine=whisper key=alt_r model=medium.en
+# Override model to use Whisper
+make run key=alt_r model=medium.en
 
 # Multiple options
-make run engine=vosk key=shift_l-alt_r mode=realtime pause=0.5
+make run key=shift_l-alt_r model=vosk-model-small-en-us-0.15 mode=realtime pause=0.5
 ```
 
 
 ### Direct Python Invocation
 
 ```bash
-# Basic usage (engine and key required)
-python voice2keyboard.py --engine whisper --key alt_r
+# Basic usage (key required, uses model from config)
+python voice2keyboard.py --key alt_r
 
-# With options
-python voice2keyboard.py --engine vosk --key shift_l-alt_r --mode buffered
+# With Vosk model
+python voice2keyboard.py --key shift_l-alt_r --model vosk-model-small-en-us-0.15
 
-# Key combination
-python voice2keyboard.py --engine whisper --key shift_l-ctrl_r
+# With Whisper model
+python voice2keyboard.py --key shift_l-ctrl_r --model medium.en
+
+# With additional options
+python voice2keyboard.py --key alt_r --mode buffered --pause 0.5
 
 # See all options
 python voice2keyboard.py --help
@@ -220,31 +228,45 @@ python voice2keyboard.py --help
 
 ### Performance Logging
 
-Track transcription performance and identify bottlenecks:
+Track transcription performance and identify bottlenecks using the `log=...`
+argument:
 
 ```bash
-# Log to file (no console output)
-make run engine=whisper key=alt_r log=performance.txt
+# Log to file (silent operation, no console output)
+make run key=alt_r log=v2k-log.txt
+
+# Log to console (stdout)
+make run key=alt_r log=/dev/stdout
+
+# Direct Python invocation
+python voice2keyboard.py --key alt_r --log v2k-log.txt
 
 # View the log in another terminal
-tail -f performance.txt
+tail -f v2k-log.txt
 ```
 
 **Log output format:**
 ```
-2025-12-26 00:09:28 | Hopefully this is still fast.
-  LATENCY=1080ms SUM=1080ms
-  wait_stop=104ms + concat=0ms + transcribe=926ms + cleanup=0ms + tokenize=0ms + typing=49ms
+time: 2025-12-26 00:09:28
+text: Hopefully this is still fast.
+info:
+  wait_stop: 104ms
+  concat=0ms
+  transcribe: 926ms
+  cleanup: 0ms
+  tokenize: 0ms
+  typing: 49ms
+  TOTAL: 1080ms
 ```
 
 **Timing breakdown:**
-- **LATENCY**: Total user-perceived delay (key release → text appears)
 - **wait_stop**: Time for recording loop to stop after key release
 - **concat**: Audio concatenation time
 - **transcribe**: Whisper transcription time (includes text collection)
 - **cleanup**: Text cleanup time (removing Whisper artifacts)
 - **tokenize**: Token processing time
 - **typing**: Keyboard simulation time
+- **TOTAL**: Total user-perceived delay (key release → text appears)
 
 Use this to:
 - Identify performance bottlenecks
@@ -255,17 +277,17 @@ Use this to:
 
 ## Running Multiple Instances
 
-You can run multiple instances simultaneously with different engines and
+You can run multiple instances simultaneously with different models and
 trigger keys:
 
 **Example:**
 
 ```bash
-# Terminal 1 - Whisper for accuracy
-make run engine=whisper key=alt_r
+# Terminal 1 - Whisper for accuracy (uses default model from config)
+make run key=alt_r
 
 # Terminal 2 - Vosk for speed
-make run engine=vosk key=ctrl_l
+make run key=ctrl_l model=vosk-model-small-en-us-0.15
 ```
 
 Now you can use `Alt_R` for accurate Whisper transcription and `Ctrl_L` for
@@ -299,29 +321,6 @@ fast Vosk transcription!
 ## Speech Engines
 
 
-### Vosk
-
-**Pros:**
-- Streaming recognition (types as you speak in realtime mode)
-- Lower latency
-- Smaller models
-
-**Cons:**
-- Lower accuracy
-- Less familiar with technical terms
-
-**Models:**
-- Download from [alphacephei.com/vosk/models](
-  https://alphacephei.com/vosk/models)
-- Extracted to project root directory
-
-| Model | Size | Notes |
-|-------|------|-------|
-| `vosk-model-small-en-us-0.15` | ~40MB | Default, fast |
-| `vosk-model-en-us-0.22-lgraph` | ~128MB | Better accuracy |
-| `vosk-model-en-us-0.22` | ~1.8GB | Best accuracy |
-
-
 ### Whisper
 
 **Pros:**
@@ -346,6 +345,29 @@ fast Vosk transcription!
 | `medium.en` | ~1.5GB | Best accuracy, slower |
 
 
+### Vosk
+
+**Pros:**
+- Streaming recognition (types as you speak in realtime mode)
+- Lower latency
+- Smaller models
+
+**Cons:**
+- Lower accuracy
+- Less familiar with technical terms
+
+**Models:**
+- Download from [alphacephei.com/vosk/models](
+  https://alphacephei.com/vosk/models)
+- Extracted to project root directory
+
+| Model | Size | Notes |
+|-------|------|-------|
+| `vosk-model-small-en-us-0.15` | ~40MB | Default, fast |
+| `vosk-model-en-us-0.22-lgraph` | ~128MB | Better accuracy |
+| `vosk-model-en-us-0.22` | ~1.8GB | Best accuracy |
+
+
 ## Key Combinations
 
 You can use modifier key combinations as triggers:
@@ -368,14 +390,15 @@ equivalent.
 
 | Command | Description |
 |---------|-------------|
+| `make run key=<trigger-key>` | Run the program |
 | `make install` | Install as systemd service (auto-starts on login) |
 | `make uninstall` | Stop and remove the service |
 | `make status` | Check service status |
 | `make logs` | View live logs (journalctl) |
-| `make run engine=ENGINE` | Run manually (engine required: vosk or whisper) |
 | `make help` | Show voice2keyboard help |
 | `make clean` | Remove generated files |
 | `make realclean` | Remove everything including models |
+| `make distclean` | Remove even .cache/ |
 
 
 ## Architecture
@@ -386,8 +409,7 @@ voice2keyboard/
 ├── config.yaml            # Configuration file
 ├── voice2keyboard.service # systemd service template
 ├── Makefile               # Build system (uses 'makes' framework)
-├── CLAUDE.md              # AI assistant instructions
-└── .cache/                # Auto-generated: Python, venv, build tools
+└── .cache/                # Auto installed: Python, venv, build tools
 ```
 
 
@@ -471,15 +493,6 @@ echo $XDG_SESSION_TYPE
 ```
 
 
-### Model not found
-
-**Vosk:** Manually download from [alphacephei.com/vosk/models](
-https://alphacephei.com/vosk/models) and extract to project root.
-
-**Whisper:** Check internet connection - models download automatically on first
-use.
-
-
 ### Double spaces or punctuation issues
 
 Make sure you're using the latest version - voice translation processing has been
@@ -497,61 +510,32 @@ pip install faster-whisper numpy
 ```
 
 
-## Development
-
-
-### Running from source
-
-```bash
-make run engine=whisper key=alt_r   # Uses managed Python environment
-```
-
-
-### Project dependencies
-
-The Makefile uses the [makes](https://github.com/makeplus/makes) framework
-which:
-- Downloads and manages a standalone Python 3.13.1 installation
-- Creates an isolated virtual environment
-- Handles model downloading and extraction
-- Generates the systemd service file with correct paths
-
-
-### Model name matching
-
-Model names support regex patterns:
-```bash
-make run engine=whisper key=alt_r model=small  # Matches small.en
-make run engine=vosk key=alt_r model=small     # Matches vosk-model-small-en-us-0.15
-```
-
-
 ## Tips
 
 
 ### Choosing an Engine
-
-**Use Vosk if:**
-- You want low latency
-- You prefer realtime typing
-- You have limited disk space
 
 **Use Whisper if:**
 - You need high accuracy
 - You frequently use technical terms
 - You can tolerate slight delay
 
+**Use Vosk if:**
+- You want low latency
+- You prefer realtime typing
+- You have limited disk space
+
 
 ### Choosing a Model
-
-**Vosk:**
-- Start with `vosk-model-small-en-us-0.15`
-- Upgrade to `vosk-model-en-us-0.22-lgraph` for better accuracy
 
 **Whisper:**
 - Use `small.en` for best speed/accuracy balance
 - Try `base.en` on slower machines
 - Use `medium.en` for maximum accuracy (slower)
+
+**Vosk:**
+- Start with `vosk-model-small-en-us-0.15`
+- Upgrade to `vosk-model-en-us-0.22-lgraph` for better accuracy
 
 
 ### Optimizing Accuracy

@@ -1,9 +1,10 @@
+/v2k-log.txt
 /.cache/
-/.claude/
-/CLAUDE.md
 /vosk*
 /__pycache__/
-/out.txt
 /.packages-installed
 /.whisper-model-downloaded
 /.whisper-packages-installed
+/.claude/
+/CLAUDE.md
+/out.txt

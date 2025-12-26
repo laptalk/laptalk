@@ -94,6 +94,13 @@ model = None  # Vosk model
 whisper_model = None  # Whisper model
 recording_thread = None
 stop_recording_event = threading.Event()
+log_file = None  # Log file handle (None = no logging)
+
+
+def log(message):
+    """Write message to log file if logging is enabled"""
+    if log_file:
+        print(message, file=log_file, flush=True)
 
 
 def check_dependencies():
@@ -104,9 +111,9 @@ def check_dependencies():
         missing.append("arecord (install with: sudo apt install alsa-utils)")
 
     if missing:
-        print("Missing dependencies:")
+        print("Missing dependencies:", file=sys.stderr)
         for dep in missing:
-            print(f"  - {dep}")
+            print(f"  - {dep}", file=sys.stderr)
         return False
 
     return True
@@ -116,6 +123,18 @@ def get_available_vosk_models():
     """Get list of downloaded Vosk models in the script directory"""
     model_dirs = glob.glob(os.path.join(SCRIPT_DIR, "vosk-model-*"))
     return [os.path.basename(d) for d in model_dirs if os.path.isdir(d)]
+
+
+def infer_engine(model_name):
+    """
+    Infer the speech engine from the model name.
+    - Models starting with 'vosk-' are Vosk models
+    - All other models are assumed to be Whisper models
+    """
+    if model_name.startswith("vosk-"):
+        return "vosk"
+    else:
+        return "whisper"
 
 
 def resolve_model_name(pattern, engine):
@@ -147,20 +166,20 @@ def resolve_model_name(pattern, engine):
         if len(matches) == 1:
             return matches[0]
         elif len(matches) > 1:
-            print(f"Pattern '{pattern}' matches multiple models:")
+            log(f"Pattern '{pattern}' matches multiple models:")
             for m in matches:
-                print(f"  - {m}")
-            print(f"Using first match: {matches[0]}")
+                log(f"  - {m}")
+            log(f"Using first match: {matches[0]}")
             return matches[0]
         else:
-            print(f"Pattern '{pattern}' does not match any available models.")
+            print(f"Pattern '{pattern}' does not match any available models.", file=sys.stderr)
             if engine == "vosk":
-                print(f"Available Vosk models: {', '.join(available) if available else 'none (download first)'}")
+                print(f"Available Vosk models: {', '.join(available) if available else 'none (download first)'}", file=sys.stderr)
             else:
-                print(f"Available Whisper models: {', '.join(available)}")
+                print(f"Available Whisper models: {', '.join(available)}", file=sys.stderr)
             return pattern
     except re.error as e:
-        print(f"Invalid regex pattern '{pattern}': {e}")
+        print(f"Invalid regex pattern '{pattern}': {e}", file=sys.stderr)
         return pattern
 
 
@@ -436,12 +455,28 @@ def stream_transcribe_whisper():
                         sum_ms = (wait_stop_ms + gap1_ms + concat_ms + gap2_ms + transcribe_ms +
                                   cleanup_ms + tokenize_ms + gap3_ms + typing_ms)
 
+                        # Pause before logging to ensure typing animation is complete
+                        time.sleep(typing_ms / 1000.0)
+
+                        # Truncate text for logging if needed
+                        if len(text) > 72:
+                            extra_chars = len(text) - 72
+                            log_text = f"{text[:72]}… +{extra_chars}"
+                        else:
+                            log_text = text
+
                         # Log: timestamp | text | breakdown
-                        print(f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} | {text}")
-                        print(f"  LATENCY={user_latency_ms:.0f}ms SUM={sum_ms:.0f}ms")
-                        print(f"  wait_stop={wait_stop_ms:.0f}ms + concat={concat_ms:.0f}ms + "
-                              f"transcribe={transcribe_ms:.0f}ms + cleanup={cleanup_ms:.0f}ms + "
-                              f"tokenize={tokenize_ms:.0f}ms + typing={typing_ms:.0f}ms")
+                        log("")  # Blank line before entry
+                        log(f"time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+                        log(f"text: {log_text}")
+                        log(f"info:")
+                        log(f"  wait_stop: {wait_stop_ms:.0f}ms")
+                        log(f"  concat: {concat_ms:.0f}ms")
+                        log(f"  transcribe: {transcribe_ms:.0f}ms")
+                        log(f"  cleanup: {cleanup_ms:.0f}ms")
+                        log(f"  tokenize: {tokenize_ms:.0f}ms")
+                        log(f"  typing: {typing_ms:.0f}ms")
+                        log(f"  TOTAL: {user_latency_ms:.0f}ms")
 
     finally:
         process.terminate()
@@ -495,27 +530,32 @@ def main():
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
+        prog="voice2keyboard.py",
+        usage="%(prog)s --key KEY [--log LOG] [--model MODEL]",
         description="Voice-to-keyboard: Hold a key to record, text appears as you speak",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --engine whisper --key alt_r
-  %(prog)s --engine vosk --key shift_l-ctrl_r
-  %(prog)s --engine whisper --key ctrl_l --mode realtime
-  %(prog)s --engine whisper --key alt_r --model medium.en
+  %(prog)s --key alt_r
+  %(prog)s --key shift_l-ctrl_r --model vosk-model-small-en-us-0.15
+  %(prog)s --key ctrl_l --mode buffered
+  %(prog)s --key alt_r --model medium.en
 
 Available keys: """ + ", ".join(sorted(k for k in KEY_MAP.keys() if not k.startswith('ctl_'))) + """
 
 Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
+
+Select a model and other options in config.yaml or use --model=... etc.
 """
     )
 
-    parser.add_argument("--engine", choices=["whisper", "vosk"], required=True,
-                        help="Speech recognition engine (required)")
-    parser.add_argument("--model",
-                        help="Model name (default: from config)")
     parser.add_argument("--key", required=True,
                         help="Trigger key or combination (e.g., 'alt_r', 'shift_l-ctrl_r') (required)")
+    parser.add_argument("--log",
+                        help="Log file path (default: no logging). Use /dev/stdout for console output")
+
+    parser.add_argument("--model",
+                        help="Model name (default: from config, engine auto-inferred)")
     parser.add_argument("--mode", dest="typing_mode", choices=["buffered", "realtime"],
                         help="Typing mode (default: from config)")
     parser.add_argument("--pause", type=float, metavar="SECONDS",
@@ -523,22 +563,31 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
 
     args = parser.parse_args()
 
-    # Engine is required from command line
-    engine = args.engine
+    # Set up logging
+    global log_file
+    log_path = args.log if args.log else config.get("log")
+    if log_path:
+        log_file = open(log_path, 'w', buffering=1)  # Line buffered
+    else:
+        log_file = None
+
+    # Get model name from command line or config
+    if args.model:
+        model_name = args.model
+    else:
+        # Get model from config
+        model_name = config.get("model")
+        if not model_name:
+            print("Error: No model specified", file=sys.stderr)
+            print("Either set 'model' in config.yaml or use --model on command line", file=sys.stderr)
+            return 1
+
+    # Infer engine from model name
+    engine = infer_engine(model_name)
     ENGINE = engine  # Update global so on_key_press uses the right engine
 
     # Resolve model name (support regex matching)
-    if args.model:
-        model_name = resolve_model_name(args.model, engine)
-    else:
-        # Get model from config based on engine
-        config_key = f"{engine}-model"
-        model_name = config.get(config_key)
-        if not model_name:
-            print(f"Error: No model specified for {engine} engine")
-            print(f"Either set '{config_key}' in config.yaml or use --model on command line")
-            return 1
-        model_name = resolve_model_name(model_name, engine)
+    model_name = resolve_model_name(model_name, engine)
 
     # Parse trigger key - support combinations like "shift-ctrl_r"
     if "-" in args.key:
@@ -549,8 +598,8 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
             if key_obj is None:
                 # Show documented keys only (exclude ctl_ aliases)
                 valid_keys = sorted(k for k in KEY_MAP.keys() if not k.startswith('ctl_'))
-                print(f"Error: Invalid key name '{k}'")
-                print(f"Valid keys: {', '.join(valid_keys)}")
+                print(f"Error: Invalid key name '{k}'", file=sys.stderr)
+                print(f"Valid keys: {', '.join(valid_keys)}", file=sys.stderr)
                 return 1
             TRIGGER_KEYS.add(key_obj)
     else:
@@ -558,8 +607,8 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
         if key_obj is None:
             # Show documented keys only (exclude ctl_ aliases)
             valid_keys = sorted(k for k in KEY_MAP.keys() if not k.startswith('ctl_'))
-            print(f"Error: Invalid key name '{args.key}'")
-            print(f"Valid keys: {', '.join(valid_keys)}")
+            print(f"Error: Invalid key name '{args.key}'", file=sys.stderr)
+            print(f"Valid keys: {', '.join(valid_keys)}", file=sys.stderr)
             return 1
         TRIGGER_KEYS = {key_obj}
     if args.typing_mode:
@@ -572,40 +621,40 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
 
     # Check if requested engine is available
     if engine == "vosk" and not VOSK_AVAILABLE:
-        print(f"Error: Vosk engine selected but not installed")
-        print(f"Run: pip install vosk")
+        print(f"Error: Vosk engine selected but not installed", file=sys.stderr)
+        print(f"Run: pip install vosk", file=sys.stderr)
         return 1
     elif engine == "whisper" and not WHISPER_AVAILABLE:
-        print(f"Error: Whisper engine selected but not installed")
-        print(f"Run: pip install faster-whisper numpy")
+        print(f"Error: Whisper engine selected but not installed", file=sys.stderr)
+        print(f"Run: pip install faster-whisper numpy", file=sys.stderr)
         return 1
 
     if engine == "vosk":
         model_path = os.path.join(SCRIPT_DIR, model_name)
 
         if not os.path.exists(model_path):
-            print(f"Vosk model not found at {model_path}")
+            print(f"Vosk model not found at {model_path}", file=sys.stderr)
             return 1
 
-        print(f"Loading Vosk model ({model_name})...")
+        log(f"Loading Vosk model ({model_name})...")
         model = Model(model_path)
 
     elif engine == "whisper":
-        print(f"Loading Whisper model ({model_name})...")
+        log(f"Loading Whisper model ({model_name})...")
         whisper_model = WhisperModel(
             model_name,
             device="cpu",
             compute_type="int8",
             cpu_threads=4,  # Prevents thread contention
         )
-        print(f"Whisper model loaded")
+        log(f"Whisper model loaded")
 
         # Warn if realtime mode is set with Whisper
         if TYPING_MODE == "realtime":
-            print("Warning: realtime mode not supported with Whisper engine, using buffered mode")
+            log("Warning: realtime mode not supported with Whisper engine, using buffered mode")
 
     else:
-        print(f"Unknown engine: {engine}")
+        print(f"Unknown engine: {engine}", file=sys.stderr)
         return 1
 
     # Format trigger keys display
@@ -614,14 +663,16 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
     else:
         trigger_display = str(list(TRIGGER_KEYS)[0])
 
-    print("voice2keyboard running")
-    print(f"Engine: {engine}")
-    print(f"Hold {trigger_display} to record")
-    print(f"Mode: {TYPING_MODE}" + (f" (pause_delay: {PAUSE_DELAY}s)" if TYPING_MODE == "buffered" and PAUSE_DELAY > 0 else ""))
-    print("Press Ctrl+C to exit")
+    log("voice2keyboard running")
+    log(f"Engine: {engine}")
+    log(f"Hold {trigger_display} to record")
+    log(f"Mode: {TYPING_MODE}" + (f" (pause_delay: {PAUSE_DELAY}s)" if TYPING_MODE == "buffered" and PAUSE_DELAY > 0 else ""))
+    log("Press Ctrl+C to exit")
 
     def signal_handler(sig, frame):
-        print("\nExiting...")
+        log("\nExiting...")
+        if log_file:
+            log_file.close()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)

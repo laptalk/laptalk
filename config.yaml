@@ -1,33 +1,37 @@
 # voice2keyboard configuration
 
 #------------------------------------------------------------------------------
-# Whisper models (uncomment one for whisper):
+# Model selection - uncomment one of the models below.
+# - Whisper models: tiny, tiny.en, base, base.en, small, small.en, etc.
+# - Vosk models: vosk-model-small-en-us-0.15, vosk-model-en-us-0.22, etc.
 #------------------------------------------------------------------------------
-# Regular Whisper models:
-# whisper-model: tiny              # Multilingual, fastest, least accurate (~75MB)
-# whisper-model: tiny.en           # English only, fastest, least accurate (~75MB)
-# whisper-model: base              # Multilingual, fast, good for simple speech (~150MB)
-whisper-model: base.en           # English only, fast, good for simple speech (~150MB)
-# whisper-model: small             # Multilingual, balanced speed/accuracy (~500MB)
-# whisper-model: small.en            # English only, balanced speed/accuracy (~500MB, default)
-# whisper-model: medium            # Multilingual, more accurate, slower (~1.5GB)
-# whisper-model: medium.en         # English only, more accurate, slower (~1.5GB)
-# whisper-model: large             # Multilingual, most accurate, slowest (~3GB)
-# whisper-model: large-v1          # Multilingual, most accurate, slowest (~3GB)
-# whisper-model: large-v2          # Multilingual, improved large model (~3GB)
-# whisper-model: large-v3          # Multilingual, latest large model (~3GB)
-# Distil-Whisper models (5-6x faster than regular models):
-# whisper-model: distil-small.en   # 5-6x faster than small.en (~170MB)
-# whisper-model: distil-medium.en  # 5-6x faster than medium.en (~400MB)
-# whisper-model: distil-large-v2   # 5-6x faster than large-v2 (~1.5GB)
-# whisper-model: distil-large-v3   # 5-6x faster than large-v3 (~1.5GB)
 
-#------------------------------------------------------------------------------
-# Vosk models (uncomment one for vosk):
-#------------------------------------------------------------------------------
-vosk-model: vosk-model-small-en-us-0.15        # Fast, lightweight (~40MB, default)
-# vosk-model: vosk-model-en-us-0.22            # More accurate, larger (~1.8GB)
-# vosk-model: vosk-model-en-us-0.22-lgraph     # Optimized for speed (~128MB)
+# Whisper models (uncomment to use):
+# model: tiny                                  # Multilingual, fastest, least accurate (~75MB)
+# model: tiny.en                               # English only, fastest, least accurate (~75MB)
+# model: base                                  # Multilingual, fast, good for simple speech (~150MB)
+model: base.en                               # Whisper: English only, fast, good balance (~150MB)
+# model: small                                 # Multilingual, balanced speed/accuracy (~500MB)
+# model: small.en                              # English only, balanced speed/accuracy (~500MB)
+# model: medium                                # Multilingual, more accurate, slower (~1.5GB)
+# model: medium.en                             # English only, more accurate, slower (~1.5GB)
+# model: large                                 # Multilingual, most accurate, slowest (~3GB)
+# model: large-v1                              # Multilingual, most accurate, slowest (~3GB)
+# model: large-v2                              # Multilingual, improved large model (~3GB)
+# model: large-v3                              # Multilingual, latest large model (~3GB)
+# Distil-Whisper models (5-6x faster than regular models):
+# model: distil-small.en                       # 5-6x faster than small.en (~170MB)
+# model: distil-medium.en                      # 5-6x faster than medium.en (~400MB)
+# model: distil-large-v2                       # 5-6x faster than large-v2 (~1.5GB)
+# model: distil-large-v3                       # 5-6x faster than large-v3 (~1.5GB)
+
+# Vosk models (uncomment to use):
+# model: vosk-model-small-en-us-0.15           # Fast, lightweight (~40MB)
+# model: vosk-model-en-us-0.22                 # More accurate, larger (~1.8GB)
+# model: vosk-model-en-us-0.22-lgraph          # Optimized for speed (~128MB)
+
+# Log file
+log: v2k-log.txt
 
 # Typing mode: how text is output
 # - buffered: Wait for natural pauses before typing (more accurate, recommended)
