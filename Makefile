@@ -41,6 +41,7 @@ model ?=
 key ?=
 mode ?=
 pause ?=
+log ?=
 
 # Build command-line arguments
 RUN_ARGS :=
@@ -79,7 +80,11 @@ endif
 ifeq ($(engine),whisper)
 	@$(MAKE) -s $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
 endif
+ifneq ($(log),)
+	python voice2keyboard.py $(RUN_ARGS) > $(log) 2>&1
+else
 	python voice2keyboard.py $(RUN_ARGS)
+endif
 
 help: $(DEPS)
 	python voice2keyboard.py --help

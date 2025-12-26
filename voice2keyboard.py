@@ -8,6 +8,7 @@ import threading
 import signal
 import subprocess
 import time
+from datetime import datetime
 import argparse
 import re
 import glob
@@ -58,7 +59,12 @@ WHISPER_MODELS = [
     "base", "base.en",
     "small", "small.en",
     "medium", "medium.en",
-    "large", "large-v1", "large-v2", "large-v3"
+    "large", "large-v1", "large-v2", "large-v3",
+    # Distil-Whisper models (5-6x faster, similar accuracy)
+    "distil-small.en",
+    "distil-medium.en",
+    "distil-large-v2",
+    "distil-large-v3",
 ]
 
 
@@ -70,11 +76,13 @@ def load_config():
 
 config = load_config()
 # Normalize voice translation keys to lowercase for case-insensitive matching
-VOICE_TRANSLATIONS = {k.lower(): v for k, v in config.get("translations", {}).items()}
+VOICE_TRANSLATIONS = {k.lower(): v for k, v in config.get("vosk-translations", {}).items()}
 TYPING_MODE = config.get("mode", "buffered")  # buffered or realtime
 PAUSE_DELAY = config.get("pause", 0.3)
 
 # Global state
+ENGINE = None  # Current speech engine (vosk or whisper)
+key_release_time = None  # Track when user released the key
 is_recording = False
 has_typed_anything = False
 capitalize_next = True  # Capitalize first word and after sentence-ending punctuation
@@ -204,7 +212,8 @@ def type_text(words):
     if not words:
         return
 
-    processed = process_voice_translations(words)
+    # Only apply voice translations for Vosk (Whisper handles punctuation natively)
+    processed = process_voice_translations(words) if ENGINE == "vosk" else words
 
     for word in processed:
         is_punctuation = word in ".,?!:;"
@@ -316,7 +325,9 @@ def stream_transcribe():
 
 def stream_transcribe_whisper():
     """Record and transcribe audio using faster-whisper with VAD"""
-    global whisper_model
+    global whisper_model, last_char_typed
+
+    pipeline_start = time.perf_counter()
 
     # Start arecord process (same as Vosk)
     process = subprocess.Popen([
@@ -340,28 +351,50 @@ def stream_transcribe_whisper():
             audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
             audio_chunks.append(audio_chunk)
 
+        recording_done = time.perf_counter()
+
         # Transcribe accumulated audio when key is released
         if audio_chunks:
+            before_concat = time.perf_counter()
             audio_data = np.concatenate(audio_chunks)
+            after_concat = time.perf_counter()
 
             # Skip if recording is too short (less than 0.5 seconds)
             if len(audio_data) >= SAMPLE_RATE * 0.5:
+                # Time the transcription
+                before_transcribe = time.perf_counter()
+                timestamp = datetime.now()
+
+                start_time = time.perf_counter()
+
+                # Use optimized settings for faster transcription
                 segments, _ = whisper_model.transcribe(
                     audio_data,
                     language="en",
-                    vad_filter=True
+                    beam_size=1,                        # Reduced from default 5
+                    temperature=0.0,                    # Disable fallback cascade
+                    condition_on_previous_text=False,   # Not needed for short recordings
+                    vad_filter=False,                   # User controls start/stop
+                    # compression_ratio_threshold uses default 2.4 to prevent hallucinations
                 )
 
-                # Collect all segment text
+                # Force evaluation of segments (generator) and collect text
+                # This is where the actual transcription work happens!
                 text = " ".join(segment.text.strip() for segment in segments)
+
+                after_transcribe = time.perf_counter()
+                elapsed_ms = (after_transcribe - start_time) * 1000
 
                 if text:
                     # Clean up Whisper quirks
+                    before_cleanup = time.perf_counter()
                     text = text.replace(",,", ",")  # Multiple commas to single comma
                     if text.endswith("..."):
                         text = text[:-3]  # Remove trailing ellipsis
+                    after_cleanup = time.perf_counter()
 
                     # Split words and separate punctuation for voice translation matching
+                    before_tokenize = time.perf_counter()
                     tokens = []
                     for word in text.split():
                         # Separate trailing punctuation from word
@@ -372,8 +405,10 @@ def stream_transcribe_whisper():
                         if trailing:
                             # Add each punctuation character separately
                             tokens.extend(list(trailing))
+                    after_tokenize = time.perf_counter()
 
                     if tokens:
+                        typing_start = time.perf_counter()
                         type_text(tokens)
                         # Add space after transcribed text only if it doesn't end with punctuation
                         # and we didn't just type a space (prevent double spaces)
@@ -381,6 +416,32 @@ def stream_transcribe_whisper():
                         if last_token not in (".", ",", "?", "!", ":", ";") and last_char_typed != " ":
                             kb_controller.type(" ")
                             last_char_typed = " "
+                        typing_done = time.perf_counter()
+
+                        # Calculate timing breakdown - EVERYTHING from key release to typing done
+                        user_latency_ms = (typing_done - key_release_time) * 1000 if key_release_time else 0
+
+                        # Detailed breakdown of every stage
+                        wait_stop_ms = (recording_done - key_release_time) * 1000 if key_release_time else 0
+                        gap1_ms = (before_concat - recording_done) * 1000
+                        concat_ms = (after_concat - before_concat) * 1000
+                        gap2_ms = (before_transcribe - after_concat) * 1000
+                        transcribe_ms = elapsed_ms  # Now includes text collection (generator evaluation)
+                        cleanup_ms = (after_cleanup - before_cleanup) * 1000
+                        tokenize_ms = (after_tokenize - before_tokenize) * 1000
+                        gap3_ms = (typing_start - after_tokenize) * 1000
+                        typing_ms = (typing_done - typing_start) * 1000
+
+                        # Sum check
+                        sum_ms = (wait_stop_ms + gap1_ms + concat_ms + gap2_ms + transcribe_ms +
+                                  cleanup_ms + tokenize_ms + gap3_ms + typing_ms)
+
+                        # Log: timestamp | text | breakdown
+                        print(f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')} | {text}")
+                        print(f"  LATENCY={user_latency_ms:.0f}ms SUM={sum_ms:.0f}ms")
+                        print(f"  wait_stop={wait_stop_ms:.0f}ms + concat={concat_ms:.0f}ms + "
+                              f"transcribe={transcribe_ms:.0f}ms + cleanup={cleanup_ms:.0f}ms + "
+                              f"tokenize={tokenize_ms:.0f}ms + typing={typing_ms:.0f}ms")
 
     finally:
         process.terminate()
@@ -412,7 +473,7 @@ def on_key_press(key):
 
 def on_key_release(key):
     """Handle key release events"""
-    global is_recording, recording_thread, currently_pressed_keys
+    global is_recording, recording_thread, currently_pressed_keys, key_release_time
 
     # Remove from pressed keys
     currently_pressed_keys.discard(key)
@@ -421,6 +482,7 @@ def on_key_release(key):
     if is_recording and key in TRIGGER_KEYS:
         with lock:
             if is_recording:
+                key_release_time = time.perf_counter()  # Track when user released key
                 is_recording = False
                 stop_recording_event.set()
                 if recording_thread:
@@ -448,7 +510,7 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
 """
     )
 
-    parser.add_argument("--engine", choices=["vosk", "whisper"], required=True,
+    parser.add_argument("--engine", choices=["whisper", "vosk"], required=True,
                         help="Speech recognition engine (required)")
     parser.add_argument("--model",
                         help="Model name (default: from config)")
@@ -533,7 +595,8 @@ Key combinations: Use '-' to combine keys (e.g., shift_l-ctrl_l, shift_l-alt_r)
         whisper_model = WhisperModel(
             model_name,
             device="cpu",
-            compute_type="int8"
+            compute_type="int8",
+            cpu_threads=4,  # Prevents thread contention
         )
         print(f"Whisper model loaded")
 

@@ -4,4 +4,6 @@
 /vosk*
 /__pycache__/
 /out.txt
+/.packages-installed
 /.whisper-model-downloaded
+/.whisper-packages-installed

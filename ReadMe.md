@@ -218,6 +218,41 @@ python voice2keyboard.py --help
 ```
 
 
+### Performance Logging
+
+Track transcription performance and identify bottlenecks:
+
+```bash
+# Log to file (no console output)
+make run engine=whisper key=alt_r log=performance.txt
+
+# View the log in another terminal
+tail -f performance.txt
+```
+
+**Log output format:**
+```
+2025-12-26 00:09:28 | Hopefully this is still fast.
+  LATENCY=1080ms SUM=1080ms
+  wait_stop=104ms + concat=0ms + transcribe=926ms + cleanup=0ms + tokenize=0ms + typing=49ms
+```
+
+**Timing breakdown:**
+- **LATENCY**: Total user-perceived delay (key release → text appears)
+- **wait_stop**: Time for recording loop to stop after key release
+- **concat**: Audio concatenation time
+- **transcribe**: Whisper transcription time (includes text collection)
+- **cleanup**: Text cleanup time (removing Whisper artifacts)
+- **tokenize**: Token processing time
+- **typing**: Keyboard simulation time
+
+Use this to:
+- Identify performance bottlenecks
+- Compare different models
+- Test optimization settings
+- Debug latency issues
+
+
 ## Running Multiple Instances
 
 You can run multiple instances simultaneously with different engines and
