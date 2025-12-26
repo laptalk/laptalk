@@ -567,7 +567,7 @@ Select a model and other options in config.yaml or use --model=... etc.
     global log_file
     log_path = args.log if args.log else config.get("log")
     if log_path:
-        log_file = open(log_path, 'w', buffering=1)  # Line buffered
+        log_file = open(log_path, 'a', buffering=1)  # Line buffered, append mode
     else:
         log_file = None
 
