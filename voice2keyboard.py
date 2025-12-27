@@ -79,6 +79,8 @@ config = load_config()
 VOICE_TRANSLATIONS = {k.lower(): v for k, v in config.get("vosk-translations", {}).items()}
 TYPING_MODE = config.get("mode", "buffered")  # buffered or realtime
 PAUSE_DELAY = config.get("pause", 0.3)
+# Normalize hallucinations by stripping trailing spaces/periods
+HALLUCINATIONS = [h.rstrip(' .') for h in config.get("hallucinations", [])]
 
 # Global state
 ENGINE = None  # Current speech engine (vosk or whisper)
@@ -426,15 +428,19 @@ def stream_transcribe_whisper():
                             tokens.extend(list(trailing))
                     after_tokenize = time.perf_counter()
 
+                    # Check for hallucination - skip typing but still log
+                    is_hallucination = text.rstrip(' .') in HALLUCINATIONS
+
                     if tokens:
                         typing_start = time.perf_counter()
-                        type_text(tokens)
-                        # Add space after transcribed text only if it doesn't end with punctuation
-                        # and we didn't just type a space (prevent double spaces)
-                        last_token = tokens[-1]
-                        if last_token not in (".", ",", "?", "!", ":", ";") and last_char_typed != " ":
-                            kb_controller.type(" ")
-                            last_char_typed = " "
+                        if not is_hallucination:
+                            type_text(tokens)
+                            # Add space after transcribed text only if it doesn't end with punctuation
+                            # and we didn't just type a space (prevent double spaces)
+                            last_token = tokens[-1]
+                            if last_token not in (".", ",", "?", "!", ":", ";") and last_char_typed != " ":
+                                kb_controller.type(" ")
+                                last_char_typed = " "
                         typing_done = time.perf_counter()
 
                         # Calculate timing breakdown - EVERYTHING from key release to typing done
@@ -468,7 +474,7 @@ def stream_transcribe_whisper():
                         # Log: timestamp | text | breakdown
                         log("")  # Blank line before entry
                         log(f"time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-                        log(f"text: {log_text}")
+                        log(f"text: {log_text}{' [HALLUCINATION]' if is_hallucination else ''}")
                         log(f"info:")
                         log(f"  wait_stop: {wait_stop_ms:.0f}ms")
                         log(f"  concat: {concat_ms:.0f}ms")

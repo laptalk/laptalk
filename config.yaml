@@ -43,6 +43,18 @@ mode: buffered
 # Set to 0 to disable. Only applies in buffered mode.
 pause: 0.3
 
+# Whisper hallucinations to ignore
+# When Whisper is given silence or very short audio, it sometimes generates these
+# Add your own if they happen and consider filing an issue with this repo
+hallucinations:
+- You
+- Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay.
+  Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay.
+  Okay. Okay.
+- Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay.
+  Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay. Okay.
+  Okay. Okay. Okay.
+
 # Voice translations for punctuation and formatting (Vosk only)
 # Say the word on the left, get the symbol on the right
 # Note: Whisper handles punctuation natively, so these are not used with Whisper
