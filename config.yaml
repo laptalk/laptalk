@@ -50,9 +50,9 @@ hallucinations:
 - Oh
 - You
 - Huh
-- . . .
 - Okay. Okay. Okay*
 - a little bit of a little bit of a little bit of a little bit*
+- So, we're going to be doing this. So, we're going to be doing this.*
 
 # Voice translations for punctuation and formatting (Vosk only)
 # Say the word on the left, get the symbol on the right

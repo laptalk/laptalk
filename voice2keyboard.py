@@ -145,6 +145,10 @@ def is_hallucination_text(text):
     if not normalized:
         return True
 
+    # Ignore text starting with a period (user intent to cancel)
+    if normalized.startswith('.'):
+        return True
+
     # Check exact matches
     if normalized in HALLUCINATIONS_EXACT:
         return True
