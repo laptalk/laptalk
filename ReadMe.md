@@ -6,7 +6,9 @@ Voice to Keyboard Typing
 
 ## Status
 
-Only tested on Linux so far.
+* Tested on Linux
+* Heard it works on macOS
+
 Please report any issues or success stories.
 
 
@@ -99,8 +101,95 @@ That's it! The service will:
 1. Download Python 3.13.1 and create a virtual environment
 2. Install required Python packages
 3. Download the configured speech recognition model
-4. Install and enable the systemd user service
-5. Start the service immediately
+
+For always-on availability, see the **Running as a Service** section below.
+
+
+## Running as a Service (Linux/systemd)
+
+To have voice2keyboard start automatically on login and run in the background:
+
+### Quick Install
+
+```bash
+cd voice2keyboard
+make install
+```
+
+This will:
+1. Copy the service file to `~/.config/systemd/user/voice2keyboard.service`
+2. Enable the service to start on login
+3. Start the service immediately
+
+### Customize Before Installing
+
+The service file may need adjustment for your system's X11 configuration.
+
+**Check your environment:**
+```bash
+echo "DISPLAY=$DISPLAY"
+echo "XAUTHORITY=$XAUTHORITY"
+```
+
+**Edit the service file if needed:**
+```bash
+# Edit voice2keyboard.service before running make install
+nano voice2keyboard.service
+```
+
+Update the `Environment` lines to match your system:
+```ini
+Environment="DISPLAY=:1"                              # Your DISPLAY value
+Environment="XAUTHORITY=/run/user/1000/gdm/Xauthority" # Your XAUTHORITY path
+```
+
+**Customize the trigger key and log location:**
+
+The default service uses `key=alt_r` and logs to `v2k-log.txt`. Edit line 7:
+```ini
+ExecStart=/usr/bin/make -C %h/src/voice2keyboard run key=alt_r log=%h/src/voice2keyboard/v2k-log.txt
+```
+
+Change `key=alt_r` to your preferred key or key combination.
+
+### Managing the Service
+
+```bash
+# Check if it's running
+make status
+
+# View live logs
+make logs
+
+# Or view the app log file
+tail -f v2k-log.txt
+
+# Stop and remove the service
+make uninstall
+
+# Restart after making changes
+systemctl --user restart voice2keyboard
+```
+
+### Service Configuration
+
+The service file supports:
+- **Auto-restart on failure** - Automatically recovers from crashes
+- **Starts on login** - Always available when you log in
+- **Background operation** - Runs silently in the background
+- **Logging** - All output logged via journalctl or to file
+
+### Hot-Reload Config
+
+The service supports hot-reloading configuration changes! Edit `config.yaml`
+while the service is running and changes will be automatically detected and
+applied (except model changes, which require a service restart).
+
+Reloadable settings:
+- `mode` (buffered/realtime)
+- `pause` (pause delay)
+- `hallucinations` (ignored phrases)
+- `vosk-translations` (voice-to-symbol mappings)
 
 
 ## Usage
@@ -501,8 +590,8 @@ echo $XDG_SESSION_TYPE
 
 ### Double spaces or punctuation issues
 
-Make sure you're using the latest version - voice translation processing has been
-improved to handle Whisper's automatic punctuation.
+Make sure you're using the latest version - voice translation processing has
+been improved to handle Whisper's automatic punctuation.
 
 
 ### Engine not installed

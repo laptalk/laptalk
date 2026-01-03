@@ -16,6 +16,8 @@ import glob
 import yaml
 from pynput import keyboard
 from pynput.keyboard import Key, Controller
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # Try to import both engines - will be used based on runtime selection
 try:
@@ -101,6 +103,100 @@ def init_config(config_path):
     return config
 
 
+def reload_config():
+    """Reload hot-reloadable settings from config file.
+
+    Reloads: mode, pause, hallucinations, vosk-translations
+    Does NOT reload: model (requires restart)
+    """
+    global config, VOICE_TRANSLATIONS, TYPING_MODE, PAUSE_DELAY
+    global HALLUCINATIONS_EXACT, HALLUCINATIONS_SUBSTRING
+
+    try:
+        new_config = load_config(config_path)
+    except Exception as e:
+        log(f"Config reload failed: {e}")
+        return False
+
+    with lock:
+        # Update config dict
+        config = new_config
+
+        # Reload voice translations
+        VOICE_TRANSLATIONS = {
+            k.lower(): v
+            for k, v in config.get("vosk-translations", {}).items()
+        }
+
+        # Reload typing mode
+        TYPING_MODE = config.get("mode", "buffered")
+
+        # Reload pause delay
+        PAUSE_DELAY = config.get("pause", 0.3)
+
+        # Reload hallucinations
+        _raw_hallucinations = config.get("hallucinations", [])
+        HALLUCINATIONS_EXACT = []
+        HALLUCINATIONS_SUBSTRING = []
+        for h in _raw_hallucinations:
+            if h.endswith('*'):
+                HALLUCINATIONS_SUBSTRING.append(h[:-1].lower())
+            else:
+                HALLUCINATIONS_EXACT.append(h.rstrip(' .').lower())
+
+    log(f"Config reloaded: mode={TYPING_MODE}, pause={PAUSE_DELAY}, "
+        f"hallucinations={len(HALLUCINATIONS_EXACT) + len(HALLUCINATIONS_SUBSTRING)}, "
+        f"translations={len(VOICE_TRANSLATIONS)}")
+    return True
+
+
+class ConfigFileHandler(FileSystemEventHandler):
+    """Watch for config file changes and trigger reload."""
+
+    def __init__(self, config_filename):
+        self.config_filename = config_filename
+        self._last_reload = 0
+        self._debounce_seconds = 0.5  # Prevent rapid reloads
+
+    def on_modified(self, event):
+        # Only react to our config file
+        if event.is_directory:
+            return
+        if os.path.basename(event.src_path) != self.config_filename:
+            return
+
+        # Debounce - editors may trigger multiple events
+        now = time.time()
+        if now - self._last_reload < self._debounce_seconds:
+            return
+        self._last_reload = now
+
+        log(f"Config file changed, reloading...")
+        reload_config()
+
+
+def start_config_watcher():
+    """Start the config file watcher in a daemon thread.
+
+    Returns the Observer instance (for potential cleanup).
+    """
+    if not config_path:
+        log("Warning: config_path not set, skipping config watcher")
+        return None
+
+    config_dir = os.path.dirname(os.path.abspath(config_path))
+    config_filename = os.path.basename(config_path)
+
+    handler = ConfigFileHandler(config_filename)
+    observer = Observer()
+    observer.schedule(handler, config_dir, recursive=False)
+    observer.daemon = True  # Die with main thread
+    observer.start()
+
+    log(f"Config watcher started for: {config_path}")
+    return observer
+
+
 # Config-dependent globals (initialized in main after --config is parsed)
 config = None
 VOICE_TRANSLATIONS = {}
@@ -124,6 +220,8 @@ whisper_model = None  # Whisper model
 recording_thread = None
 stop_recording_event = threading.Event()
 log_file = None  # Log file handle (None = no logging)
+config_path = None  # Set in main(), used by config watcher
+config_observer = None  # Config file watcher observer
 
 
 def log(message):
@@ -147,6 +245,10 @@ def is_hallucination_text(text):
 
     # Ignore text starting with a period (user intent to cancel)
     if normalized.startswith('.'):
+        return True
+
+    # Ignore single letters
+    if len(normalized) == 1 and normalized.isalpha():
         return True
 
     # Check exact matches
@@ -590,6 +692,7 @@ def on_key_release(key):
 
 def main():
     global model, whisper_model, TRIGGER_KEYS, TYPING_MODE, PAUSE_DELAY, ENGINE
+    global config_path, config_observer
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
@@ -740,11 +843,16 @@ Select a model and other options in config.yaml or use --model=... etc.
 
     def signal_handler(sig, frame):
         log("\nExiting...")
+        if config_observer:
+            config_observer.stop()
         if log_file:
             log_file.close()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
+
+    # Start config file watcher
+    config_observer = start_config_watcher()
 
     with keyboard.Listener(on_press=on_key_press, on_release=on_key_release) as listener:
         listener.join()

@@ -113,7 +113,7 @@ logs:
 	journalctl --user -u voice2keyboard -f
 
 $(PYTHON-VENV)/bin/pynput: $(PYTHON-VENV)
-	@pip install -q --disable-pip-version-check pynput pyyaml vosk
+	@pip install -q --disable-pip-version-check pynput pyyaml vosk watchdog
 
 $(PYTHON-VENV)/bin/faster_whisper: $(PYTHON-VENV)
 	@pip install -q --disable-pip-version-check faster-whisper numpy

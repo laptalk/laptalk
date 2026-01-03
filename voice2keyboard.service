@@ -4,9 +4,15 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/src/voice2keyboard/.cache/.local/python-venv/bin/python %h/src/voice2keyboard/voice2keyboard.py --engine=whisper --key=alt_r
+ExecStart=/usr/bin/make -C %h/src/voice2keyboard run key=alt_r log=%h/src/voice2keyboard/v2k-log.txt
 Restart=on-failure
 RestartSec=5
+
+# X11 environment (may need adjustment for your system)
+# Check with: echo $DISPLAY and echo $XAUTHORITY
+# Common values: DISPLAY=:0 or :1, XAUTHORITY varies by desktop environment
+Environment="DISPLAY=:1"
+Environment="XAUTHORITY=/run/user/1000/gdm/Xauthority"
 
 [Install]
 WantedBy=default.target
