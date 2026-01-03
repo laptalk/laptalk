@@ -14,6 +14,7 @@ import re
 import glob
 
 import yaml
+import platform
 from pynput import keyboard
 from pynput.keyboard import Key, Controller
 from watchdog.observers import Observer
@@ -33,13 +34,16 @@ try:
 except ImportError:
     WHISPER_AVAILABLE = False
 
+IS_MACOS = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG_FILE = os.path.join(SCRIPT_DIR, "config.yaml")
 
 SAMPLE_RATE = 16000
 ENGINE = None  # Set via command-line argument
 
-# Key name mapping
+# Key name mapping (some keys like scroll_lock, pause, insert are not available on macOS)
 KEY_MAP = {
     "alt_l": Key.alt_l,
     "alt_r": Key.alt_r,
@@ -49,11 +53,12 @@ KEY_MAP = {
     "ctl_r": Key.ctrl_r,  # Alias for ctrl_r
     "shift_l": Key.shift_l,
     "shift_r": Key.shift_r,
-    "scroll_lock": Key.scroll_lock,
-    "pause": Key.pause,
-    "insert": Key.insert,
     "delete": Key.delete,
 }
+# Add platform-specific keys only if available
+for key_name in ["scroll_lock", "pause", "insert"]:
+    if hasattr(Key, key_name):
+        KEY_MAP[key_name] = getattr(Key, key_name)
 
 # Known Whisper models
 WHISPER_MODELS = [
@@ -264,12 +269,24 @@ def is_hallucination_text(text):
     return False
 
 
+def get_audio_record_cmd():
+    """Get the platform-appropriate audio recording command."""
+    if IS_MACOS:
+        # macOS: use sox's rec command
+        return ["rec", "-q", "-t", "raw", "-b", "16", "-e", "signed", "-r", str(SAMPLE_RATE), "-c", "1", "-"]
+    else:
+        # Linux: use arecord
+        return ["arecord", "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1", "-t", "raw", "-q"]
+
+
 def check_dependencies():
     """Check if required dependencies are installed"""
     missing = []
 
-    if shutil.which("arecord") is None:
+    if IS_LINUX and shutil.which("arecord") is None:
         missing.append("arecord (install with: sudo apt install alsa-utils)")
+    elif IS_MACOS and shutil.which("rec") is None:
+        missing.append("sox (install with: brew install sox)")
 
     if missing:
         print("Missing dependencies:", file=sys.stderr)
@@ -434,15 +451,8 @@ def stream_transcribe():
 
     rec = KaldiRecognizer(model, SAMPLE_RATE)
 
-    # Start arecord process
-    process = subprocess.Popen([
-        "arecord",
-        "-f", "S16_LE",
-        "-r", str(SAMPLE_RATE),
-        "-c", "1",
-        "-t", "raw",
-        "-q"
-    ], stdout=subprocess.PIPE)
+    # Start audio recording process
+    process = subprocess.Popen(get_audio_record_cmd(), stdout=subprocess.PIPE)
 
     last_partial_words = []
 
@@ -509,15 +519,8 @@ def stream_transcribe_whisper():
 
     pipeline_start = time.perf_counter()
 
-    # Start arecord process (same as Vosk)
-    process = subprocess.Popen([
-        "arecord",
-        "-f", "S16_LE",
-        "-r", str(SAMPLE_RATE),
-        "-c", "1",
-        "-t", "raw",
-        "-q"
-    ], stdout=subprocess.PIPE)
+    # Start audio recording process
+    process = subprocess.Popen(get_audio_record_cmd(), stdout=subprocess.PIPE)
 
     audio_chunks = []
 
