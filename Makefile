@@ -44,6 +44,7 @@ key ?=
 mode ?=
 pause ?=
 log ?=
+config ?=
 
 # Build command-line arguments
 RUN_ARGS :=
@@ -64,6 +65,9 @@ ifneq ($(pause),)
 endif
 ifneq ($(log),)
   RUN_ARGS += --log=$(log)
+endif
+ifneq ($(config),)
+  RUN_ARGS += --config=$(config)
 endif
 
 # Infer engine from model name

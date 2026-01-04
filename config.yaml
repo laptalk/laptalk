@@ -43,6 +43,13 @@ mode: buffered
 # Set to 0 to disable. Only applies in buffered mode.
 pause: 0.3
 
+# Faster-whisper engine settings (ignored for Vosk models)
+whisper:
+  device: auto            # auto, cpu, cuda
+  compute_type: auto      # auto, int8, float16, float32
+  beam_size: 1            # 1 = greedy/fast, 5 = default, higher = slower/better
+  vad_filter: true        # Skip silence segments for faster processing
+
 # Whisper hallucinations to ignore
 # When Whisper is given silence or very short audio, it sometimes generates these
 # Add your own if they happen and consider filing an issue with this repo
@@ -53,6 +60,11 @@ hallucinations:
 - Okay. Okay. Okay*
 - a little bit of a little bit of a little bit of a little bit*
 - So, we're going to be doing this. So, we're going to be doing this.*
+
+# Universal translations (works with all engines)
+# Phrases are matched case-insensitively
+translations:
+  cloud code: Claude Code
 
 # Voice translations for punctuation and formatting (Vosk only)
 # Say the word on the left, get the symbol on the right

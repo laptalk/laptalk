@@ -248,6 +248,13 @@ mode: buffered
 # Set to 0 to disable. Only applies in buffered mode.
 pause: 0.3
 
+# Faster-whisper engine settings (ignored for Vosk models)
+whisper:
+  device: auto            # auto, cpu, cuda
+  compute_type: auto      # auto, int8, float16, float32
+  beam_size: 1            # 1 = greedy/fast, 5 = default, higher = slower/better
+  vad_filter: true        # Skip silence segments for faster processing
+
 # Voice translations - say the word, get the symbol
 vosk-translations:
   full stop: "."
@@ -256,6 +263,22 @@ vosk-translations:
   # Add your own...
 ```
 
+### Whisper Engine Settings
+
+Fine-tune faster-whisper performance with these settings (Whisper models only):
+
+| Setting | Values | Default | Notes |
+|---------|--------|---------|-------|
+| `device` | auto, cpu, cuda | auto | Auto-detects GPU availability |
+| `compute_type` | auto, int8, float16, float32 | auto | int8 fastest on CPU, float16 on GPU |
+| `beam_size` | 1-10 | 1 | 1 = greedy/fastest, 5 = balanced, higher = slower/better |
+| `vad_filter` | true/false | true | Skip silence for faster processing |
+
+**Performance tips:**
+- On CPU: `compute_type: int8` + `beam_size: 1` gives best speed
+- With these optimized settings, `small.en` may run as fast as `base.en` with defaults
+- Try larger models (`small.en`, `medium.en`) with optimized settings before assuming they're too slow
+- GPU users (when available) will automatically get float16 acceleration with `device: auto`
 
 ## Command Line Usage
 

@@ -83,11 +83,13 @@ def load_config(config_file):
 
 def init_config(config_path):
     """Initialize config and config-dependent globals from given path"""
-    global config, VOICE_TRANSLATIONS, TYPING_MODE, PAUSE_DELAY
+    global config, GENERAL_TRANSLATIONS, VOICE_TRANSLATIONS, TYPING_MODE, PAUSE_DELAY
     global HALLUCINATIONS_EXACT, HALLUCINATIONS_SUBSTRING
 
     config = load_config(config_path)
 
+    # Normalize general translation keys to lowercase for case-insensitive matching
+    GENERAL_TRANSLATIONS = {k.lower(): v for k, v in config.get("translations", {}).items()}
     # Normalize voice translation keys to lowercase for case-insensitive matching
     VOICE_TRANSLATIONS = {k.lower(): v for k, v in config.get("vosk-translations", {}).items()}
     TYPING_MODE = config.get("mode", "buffered")  # buffered or realtime
@@ -108,13 +110,34 @@ def init_config(config_path):
     return config
 
 
+def get_whisper_device_config(config):
+    """Determine device and compute_type based on config and hardware."""
+    whisper_config = config.get('whisper', {})
+    device = whisper_config.get('device', 'auto')
+    compute_type = whisper_config.get('compute_type', 'auto')
+
+    # Auto-detect device
+    if device == 'auto':
+        try:
+            import torch
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        except ImportError:
+            device = 'cpu'
+
+    # Auto-select compute_type based on device
+    if compute_type == 'auto':
+        compute_type = 'float16' if device == 'cuda' else 'int8'
+
+    return device, compute_type
+
+
 def reload_config():
     """Reload hot-reloadable settings from config file.
 
-    Reloads: mode, pause, hallucinations, vosk-translations
+    Reloads: mode, pause, hallucinations, translations, vosk-translations
     Does NOT reload: model (requires restart)
     """
-    global config, VOICE_TRANSLATIONS, TYPING_MODE, PAUSE_DELAY
+    global config, GENERAL_TRANSLATIONS, VOICE_TRANSLATIONS, TYPING_MODE, PAUSE_DELAY
     global HALLUCINATIONS_EXACT, HALLUCINATIONS_SUBSTRING
 
     try:
@@ -126,6 +149,12 @@ def reload_config():
     with lock:
         # Update config dict
         config = new_config
+
+        # Reload general translations
+        GENERAL_TRANSLATIONS = {
+            k.lower(): v
+            for k, v in config.get("translations", {}).items()
+        }
 
         # Reload voice translations
         VOICE_TRANSLATIONS = {
@@ -151,7 +180,8 @@ def reload_config():
 
     log(f"Config reloaded: mode={TYPING_MODE}, pause={PAUSE_DELAY}, "
         f"hallucinations={len(HALLUCINATIONS_EXACT) + len(HALLUCINATIONS_SUBSTRING)}, "
-        f"translations={len(VOICE_TRANSLATIONS)}")
+        f"general_translations={len(GENERAL_TRANSLATIONS)}, "
+        f"vosk_translations={len(VOICE_TRANSLATIONS)}")
     return True
 
 
@@ -204,6 +234,7 @@ def start_config_watcher():
 
 # Config-dependent globals (initialized in main after --config is parsed)
 config = None
+GENERAL_TRANSLATIONS = {}
 VOICE_TRANSLATIONS = {}
 TYPING_MODE = "buffered"
 PAUSE_DELAY = 0.3
@@ -361,8 +392,8 @@ def resolve_model_name(pattern, engine):
         return pattern
 
 
-def process_voice_translations(words):
-    """Convert voice translation words to punctuation and symbols"""
+def process_translations(words, translations_dict):
+    """Convert translation words to their replacement values"""
     result = []
     i = 0
     while i < len(words):
@@ -371,8 +402,8 @@ def process_voice_translations(words):
         for length in [2, 1]:
             if i + length <= len(words):
                 phrase = " ".join(words[i:i+length]).lower()
-                if phrase in VOICE_TRANSLATIONS:
-                    translation_output = VOICE_TRANSLATIONS[phrase]
+                if phrase in translations_dict:
+                    translation_output = translations_dict[phrase]
                     next_idx = i + length
 
                     # If translation produces punctuation and next token is any punctuation
@@ -403,14 +434,17 @@ def process_voice_translations(words):
 
 
 def type_text(words):
-    """Type words at current cursor position"""
+    """Type words at current cursor position. Returns (original_words, processed_words)."""
     global has_typed_anything, capitalize_next, last_char_typed
 
     if not words:
-        return
+        return words, words
 
-    # Only apply voice translations for Vosk (Whisper handles punctuation natively)
-    processed = process_voice_translations(words) if ENGINE == "vosk" else words
+    # Apply universal translations for all engines
+    processed = process_translations(words, GENERAL_TRANSLATIONS)
+    # Also apply vosk-specific translations for Vosk engine
+    if ENGINE == "vosk":
+        processed = process_translations(processed, VOICE_TRANSLATIONS)
 
     for word in processed:
         is_punctuation = word in ".,?!:;"
@@ -443,6 +477,8 @@ def type_text(words):
                 kb_controller.type(word)
                 last_char_typed = word[-1] if word else ""
                 has_typed_anything = True
+
+    return words, processed
 
 
 def stream_transcribe():
@@ -551,13 +587,14 @@ def stream_transcribe_whisper():
                 start_time = time.perf_counter()
 
                 # Use optimized settings for faster transcription
+                whisper_config = config.get('whisper', {})
                 segments, _ = whisper_model.transcribe(
                     audio_data,
                     language="en",
-                    beam_size=1,                        # Reduced from default 5
+                    beam_size=whisper_config.get('beam_size', 1),
                     temperature=0.0,                    # Disable fallback cascade
                     condition_on_previous_text=False,   # Not needed for short recordings
-                    vad_filter=False,                   # User controls start/stop
+                    vad_filter=whisper_config.get('vad_filter', True),
                     # compression_ratio_threshold uses default 2.4 to prevent hallucinations
                 )
 
@@ -595,11 +632,12 @@ def stream_transcribe_whisper():
 
                     if tokens:
                         typing_start = time.perf_counter()
+                        original_tokens, typed_tokens = None, None
                         if not is_hallucination:
-                            type_text(tokens)
+                            original_tokens, typed_tokens = type_text(tokens)
                             # Add space after transcribed text only if it doesn't end with punctuation
                             # and we didn't just type a space (prevent double spaces)
-                            last_token = tokens[-1]
+                            last_token = typed_tokens[-1] if typed_tokens else ""
                             if last_token not in (".", ",", "?", "!", ":", ";") and last_char_typed != " ":
                                 kb_controller.type(" ")
                                 last_char_typed = " "
@@ -637,6 +675,8 @@ def stream_transcribe_whisper():
                         log("")  # Blank line before entry
                         log(f"time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
                         log(f"text: {log_text}{' [HALLUCINATION]' if is_hallucination else ''}")
+                        if typed_tokens and original_tokens != typed_tokens:
+                            log(f"Text: {' '.join(typed_tokens)}")
                         log(f"info:")
                         log(f"  wait_stop: {wait_stop_ms:.0f}ms")
                         log(f"  concat: {concat_ms:.0f}ms")
@@ -816,13 +856,19 @@ Select a model and other options in config.yaml or use --model=... etc.
 
     elif engine == "whisper":
         log(f"Loading Whisper model ({model_name})...")
+        device, compute_type = get_whisper_device_config(config)
+        whisper_config = config.get('whisper', {})
+
         whisper_model = WhisperModel(
             model_name,
-            device="cpu",
-            compute_type="int8",
+            device=device,
+            compute_type=compute_type,
             cpu_threads=4,  # Prevents thread contention
         )
         log(f"Whisper model loaded")
+        log(f"Whisper config: device={device}, compute_type={compute_type}, "
+            f"beam_size={whisper_config.get('beam_size', 1)}, "
+            f"vad_filter={whisper_config.get('vad_filter', True)}")
 
         # Warn if realtime mode is set with Whisper
         if TYPING_MODE == "realtime":
