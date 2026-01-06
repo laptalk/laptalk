@@ -8,14 +8,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/make</string>
+        <string>-C</string>
+        <!-- Update this path to your voice2keyboard installation directory -->
+        <string>/Users/YOURUSER/voice2keyboard</string>
         <string>run</string>
         <string>key=alt_r</string>
-        <string>log=v2k-log.txt</string>
     </array>
-
-    <!-- Update this path to your voice2keyboard installation directory -->
-    <key>WorkingDirectory</key>
-    <string>/Users/YOURUSER/voice2keyboard</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -23,7 +21,10 @@
     <key>KeepAlive</key>
     <true/>
 
+    <key>StandardOutPath</key>
+    <string>/tmp/voice2keyboard.log</string>
+
     <key>StandardErrorPath</key>
-    <string>/tmp/voice2keyboard-error.txt</string>
+    <string>/tmp/voice2keyboard-error.log</string>
 </dict>
 </plist>
