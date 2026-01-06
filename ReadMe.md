@@ -192,6 +192,79 @@ Reloadable settings:
 - `vosk-translations` (voice-to-symbol mappings)
 
 
+## Running as a Service (macOS/launchd)
+
+To have voice2keyboard start automatically on login and run in the background on macOS:
+
+### Quick Install
+
+```bash
+cd voice2keyboard
+
+# Edit the plist file to set your installation path
+nano voice2keyboard.plist
+# Update the WorkingDirectory path to match your installation
+
+# Copy to LaunchAgents
+cp voice2keyboard.plist ~/Library/LaunchAgents/com.voice2keyboard.plist
+
+# Load and start the service
+launchctl load ~/Library/LaunchAgents/com.voice2keyboard.plist
+```
+
+### Customize Before Installing
+
+Edit `voice2keyboard.plist` before copying:
+
+1. **Set your installation path:** Update the `WorkingDirectory` value to your voice2keyboard directory
+2. **Change the trigger key:** Replace `key=alt_r` with your preferred key in the `ProgramArguments` array
+3. **Add model override:** Add `<string>model=small.en</string>` to the `ProgramArguments` array
+
+### Managing the Service
+
+```bash
+# Check if it's running
+launchctl list | grep voice2keyboard
+
+# Stop the service
+launchctl unload ~/Library/LaunchAgents/com.voice2keyboard.plist
+
+# Start the service
+launchctl load ~/Library/LaunchAgents/com.voice2keyboard.plist
+
+# Restart the service (stop then start)
+launchctl unload ~/Library/LaunchAgents/com.voice2keyboard.plist && \
+launchctl load ~/Library/LaunchAgents/com.voice2keyboard.plist
+
+# Remove the service completely
+launchctl unload ~/Library/LaunchAgents/com.voice2keyboard.plist
+rm ~/Library/LaunchAgents/com.voice2keyboard.plist
+
+# View logs
+tail -f v2k-log.txt
+tail -f /tmp/voice2keyboard-error.txt
+```
+
+### macOS Permissions
+
+macOS requires explicit permissions for accessibility and microphone access:
+
+1. **Accessibility Permission** (required for keyboard simulation):
+   - Go to **System Preferences** → **Security & Privacy** → **Privacy** → **Accessibility**
+   - Add Terminal (or your terminal app) to the list
+   - If running as a service, you may need to add `/usr/bin/make` or the Python executable
+
+2. **Microphone Permission** (required for audio capture):
+   - Go to **System Preferences** → **Security & Privacy** → **Privacy** → **Microphone**
+   - Add Terminal (or your terminal app) to the list
+
+3. **Input Monitoring** (may be required on newer macOS versions):
+   - Go to **System Preferences** → **Security & Privacy** → **Privacy** → **Input Monitoring**
+   - Add Terminal (or your terminal app) to the list
+
+**Note:** You may need to restart the service after granting permissions.
+
+
 ## Usage
 
 1. **Hold the trigger key** (default: Right Alt) in any application

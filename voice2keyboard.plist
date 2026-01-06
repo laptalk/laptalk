@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.voice2keyboard</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/make</string>
+        <string>run</string>
+        <string>key=alt_r</string>
+        <string>log=v2k-log.txt</string>
+    </array>
+
+    <!-- Update this path to your voice2keyboard installation directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/YOURUSER/voice2keyboard</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/voice2keyboard-error.txt</string>
+</dict>
+</plist>
