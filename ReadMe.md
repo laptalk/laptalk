@@ -6,8 +6,7 @@ Voice to Keyboard Typing
 
 ## Status
 
-* Tested on Linux
-* Heard it works on macOS
+Works on Linux and macOS!
 
 Please report any issues or success stories.
 
