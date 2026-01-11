@@ -1,7 +1,7 @@
 LapTalk
 =======
 
-Voice to Keyboard Typing
+Talk to your Laptop — Voice to Keyboard Typing
 
 
 ## Status
