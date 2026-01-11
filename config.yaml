@@ -1,4 +1,4 @@
-# voice2keyboard configuration
+# laptalk configuration
 
 #------------------------------------------------------------------------------
 # Model selection - uncomment one of the models below.
@@ -31,7 +31,7 @@ model: base.en                               # Whisper: English only, fast, good
 # model: vosk-model-en-us-0.22-lgraph          # Optimized for speed (~128MB)
 
 # Log file
-log: v2k-log.txt
+log: laptalk-log.txt
 
 # Typing mode: how text is output
 # - buffered: Wait for natural pauses before typing (more accurate, recommended)

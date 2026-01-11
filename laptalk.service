@@ -1,10 +1,10 @@
 [Unit]
-Description=Voice to Keyboard - Real-time voice transcription
+Description=LapTalk - Real-time voice transcription
 After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/make -C %h/src/voice2keyboard run key=alt_r log=%h/src/voice2keyboard/v2k-log.txt
+ExecStart=/usr/bin/make -C %h/src/laptalk run key=alt_r log=%h/src/laptalk/laptalk-log.txt
 Restart=on-failure
 RestartSec=5
 

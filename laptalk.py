@@ -739,9 +739,9 @@ def main():
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(
-        prog="voice2keyboard.py",
+        prog="laptalk.py",
         usage="%(prog)s --key KEY [--log LOG] [--config FILE] [--model MODEL]",
-        description="Voice-to-keyboard: Hold a key to record, text appears as you speak",
+        description="LapTalk: Hold a key to record, text appears as you speak",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -884,7 +884,7 @@ Select a model and other options in config.yaml or use --model=... etc.
     else:
         trigger_display = str(list(TRIGGER_KEYS)[0])
 
-    log("voice2keyboard running")
+    log("laptalk running")
     log(f"Engine: {engine}")
     log(f"Hold {trigger_display} to record")
     log(f"Mode: {TYPING_MODE}" + (f" (pause_delay: {PAUSE_DELAY}s)" if TYPING_MODE == "buffered" and PAUSE_DELAY > 0 else ""))

@@ -1,5 +1,5 @@
-voice2keyboard
-==============
+LapTalk
+=======
 
 Voice to Keyboard Typing
 
@@ -16,19 +16,19 @@ Please report any issues or success stories.
 Run this in a terminal:
 
 ```bash
-git clone https://github.com/ingydotnet/voice2keyboard
-cd voice2keyboard
+git clone git@github.com:laptalk/laptalk
+cd laptalk
 make run key=alt_r
 ```
 
-Then press the Right-Control key and speak and let go.
+Then press the Right-Alt key and speak and let go.
 
 Your speech will be converted to text and typed whereever your input focus is!
 
 
 ## Description
 
-`voice2keyboard` is a Linux program that provides real-time voice-to-text
+`laptalk` is a Linux program that provides real-time voice-to-text
 input.
 Hold a trigger key (or key combination) to record, and words appear at your
 cursor as you speak.
@@ -89,8 +89,8 @@ sudo apt install alsa-utils   # provides arecord
 
 ```bash
 # Clone the repository
-git clone https://github.com/ingydotnet/voice2keyboard
-cd voice2keyboard
+git clone git@github.com:laptalk/laptalk
+cd laptalk
 
 # Run it
 make run key=alt_r
@@ -106,17 +106,17 @@ For always-on availability, see the **Running as a Service** section below.
 
 ## Running as a Service (Linux/systemd)
 
-To have voice2keyboard start automatically on login and run in the background:
+To have LapTalk start automatically on login and run in the background:
 
 ### Quick Install
 
 ```bash
-cd voice2keyboard
+cd laptalk
 make install
 ```
 
 This will:
-1. Copy the service file to `~/.config/systemd/user/voice2keyboard.service`
+1. Copy the service file to `~/.config/systemd/user/laptalk.service`
 2. Enable the service to start on login
 3. Start the service immediately
 
@@ -132,8 +132,8 @@ echo "XAUTHORITY=$XAUTHORITY"
 
 **Edit the service file if needed:**
 ```bash
-# Edit voice2keyboard.service before running make install
-nano voice2keyboard.service
+# Edit laptalk.service before running make install
+nano laptalk.service
 ```
 
 Update the `Environment` lines to match your system:
@@ -144,9 +144,9 @@ Environment="XAUTHORITY=/run/user/1000/gdm/Xauthority" # Your XAUTHORITY path
 
 **Customize the trigger key and log location:**
 
-The default service uses `key=alt_r` and logs to `v2k-log.txt`. Edit line 7:
+The default service uses `key=alt_r` and logs to `laptalk-log.txt`. Edit line 7:
 ```ini
-ExecStart=/usr/bin/make -C %h/src/voice2keyboard run key=alt_r log=%h/src/voice2keyboard/v2k-log.txt
+ExecStart=/usr/bin/make -C %h/src/laptalk run key=alt_r log=%h/src/laptalk/laptalk-log.txt
 ```
 
 Change `key=alt_r` to your preferred key or key combination.
@@ -161,13 +161,13 @@ make status
 make logs
 
 # Or view the app log file
-tail -f v2k-log.txt
+tail -f laptalk-log.txt
 
 # Stop and remove the service
 make uninstall
 
 # Restart after making changes
-systemctl --user restart voice2keyboard
+systemctl --user restart laptalk
 ```
 
 ### Service Configuration
@@ -290,7 +290,7 @@ $ make run key=alt_r
 You can also also run:
 
 ```
-$ python voice2keyboard.py --key=alt_r
+$ python laptalk.py --key=alt_r
 ```
 
 but the `make` command installs all the prerequisites (including even a local
@@ -324,22 +324,22 @@ make run key=shift_l-alt_r model=vosk-model-small-en-us-0.15 mode=realtime pause
 
 ```bash
 # Basic usage (key required, uses model from config)
-python voice2keyboard.py --key alt_r
+python laptalk.py --key alt_r
 
 # With custom config file
-python voice2keyboard.py --key alt_r --config /path/to/custom-config.yaml
+python laptalk.py --key alt_r --config /path/to/custom-config.yaml
 
 # With Vosk model
-python voice2keyboard.py --key shift_l-alt_r --model vosk-model-small-en-us-0.15
+python laptalk.py --key shift_l-alt_r --model vosk-model-small-en-us-0.15
 
 # With Whisper model
-python voice2keyboard.py --key shift_l-ctrl_r --model medium.en
+python laptalk.py --key shift_l-ctrl_r --model medium.en
 
 # With additional options
-python voice2keyboard.py --key alt_r --mode buffered --pause 0.5
+python laptalk.py --key alt_r --mode buffered --pause 0.5
 
 # See all options
-python voice2keyboard.py --help
+python laptalk.py --help
 ```
 
 
@@ -350,16 +350,16 @@ argument:
 
 ```bash
 # Log to file (silent operation, no console output)
-make run key=alt_r log=v2k-log.txt
+make run key=alt_r log=laptalk-log.txt
 
 # Log to console (stdout)
 make run key=alt_r log=/dev/stdout
 
 # Direct Python invocation
-python voice2keyboard.py --key alt_r --log v2k-log.txt
+python laptalk.py --key alt_r --log laptalk-log.txt
 
 # View the log in another terminal
-tail -f v2k-log.txt
+tail -f laptalk-log.txt
 ```
 
 **Log output format:**
@@ -512,7 +512,7 @@ equivalent.
 | `make uninstall` | Stop and remove the service |
 | `make status` | Check service status |
 | `make logs` | View live logs (journalctl) |
-| `make help` | Show voice2keyboard help |
+| `make help` | Show LapTalk help |
 | `make clean` | Remove generated files |
 | `make realclean` | Remove everything including models |
 | `make distclean` | Remove even .cache/ |
@@ -521,12 +521,12 @@ equivalent.
 ## Architecture
 
 ```
-voice2keyboard/
-├── voice2keyboard.py      # Main daemon script (~500 lines)
-├── config.yaml            # Configuration file
-├── voice2keyboard.service # systemd service template
-├── Makefile               # Build system (uses 'makes' framework)
-└── .cache/                # Auto installed: Python, venv, build tools
+laptalk/
+├── laptalk.py      # Main daemon script (~500 lines)
+├── config.yaml     # Configuration file
+├── laptalk.service # systemd service template
+├── Makefile        # Build system (uses 'makes' framework)
+└── .cache/         # Auto installed: Python, venv, build tools
 ```
 
 
@@ -578,8 +578,8 @@ Type text
 ### Service won't start
 
 ```bash
-make logs                           # Check for errors
-systemctl --user status voice2keyboard
+make logs                     # Check for errors
+systemctl --user status laptalk
 ```
 
 

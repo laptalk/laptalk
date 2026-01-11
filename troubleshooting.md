@@ -1,11 +1,11 @@
-# Voice2Keyboard Troubleshooting Guide
+# LapTalk Troubleshooting Guide
 
 ## KVM/QEMU VM Microphone Passthrough
 
 ### Symptoms
 - Recording creates files of correct size but with no audio content
 - `arecord` works on host but VM recordings are silent
-- voice2keyboard returns truncated/garbled transcriptions
+- laptalk returns truncated/garbled transcriptions
 
 ### Quick Checks
 

@@ -16,7 +16,7 @@ MODEL ?= base.en
 VOSK-URL := https://alphacephei.com/vosk/models
 
 MAKES-CLEAN := \
-  v2k-log.txt \
+  laptalk-log.txt \
 
 MAKES-REALCLEAN := \
   vosk-* \
@@ -34,7 +34,7 @@ DEPS := \
 # Install target uses whisper (as set in service file)
 INSTALL_DEPS := $(DEPS) $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
 
-SERVICE-FILE := $(HOME)/.config/systemd/user/voice2keyboard.service
+SERVICE-FILE := $(HOME)/.config/systemd/user/laptalk.service
 
 export XDG_SESSION_TYPE := x11
 
@@ -86,35 +86,35 @@ endif
 ifeq ($(INFERRED_ENGINE),whisper)
 	@$(MAKE) -s $(PYTHON-VENV)/bin/faster_whisper .whisper-model-downloaded
 endif
-	python voice2keyboard.py $(RUN_ARGS)
+	python laptalk.py $(RUN_ARGS)
 
 help: $(DEPS)
 	@echo
-	@python voice2keyboard.py --help
+	@python laptalk.py --help
 
 install: $(INSTALL_DEPS) $(SERVICE-FILE)
 	systemctl --user daemon-reload
-	systemctl --user enable voice2keyboard
-	systemctl --user start voice2keyboard
-	@echo "voice2keyboard installed and running"
+	systemctl --user enable laptalk
+	systemctl --user start laptalk
+	@echo "laptalk installed and running"
 	@echo "Hold Alt_R to record and type (using Whisper engine)"
 
-$(SERVICE-FILE): voice2keyboard.service
+$(SERVICE-FILE): laptalk.service
 	mkdir -p $(dir $@)
-	sed 's|%h/src/voice2keyboard|$(ROOT)|g' $< > $@
+	sed 's|%h/src/laptalk|$(ROOT)|g' $< > $@
 
 uninstall:
-	-systemctl --user stop voice2keyboard
-	-systemctl --user disable voice2keyboard
+	-systemctl --user stop laptalk
+	-systemctl --user disable laptalk
 	rm -f $(SERVICE-FILE)
 	systemctl --user daemon-reload
-	@echo "voice2keyboard uninstalled"
+	@echo "laptalk uninstalled"
 
 status:
-	systemctl --user status voice2keyboard
+	systemctl --user status laptalk
 
 logs:
-	journalctl --user -u voice2keyboard -f
+	journalctl --user -u laptalk -f
 
 $(PYTHON-VENV)/bin/pynput: $(PYTHON-VENV)
 	@pip install -q --disable-pip-version-check pynput pyyaml vosk watchdog
